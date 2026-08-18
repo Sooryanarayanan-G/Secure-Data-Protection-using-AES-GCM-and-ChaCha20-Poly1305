@@ -5,6 +5,8 @@
 #include <vector>
 #include <cstdint>
 
+typedef std::vector<uint8_t> Bytes;
+
 enum AEAD {
     aes_128_gcm,
     chacha20_poly1305
@@ -12,18 +14,20 @@ enum AEAD {
 
 class Crypt {
     public:
-        Crypt(AEAD aeadconfig);
-        void Encrypt(const std::vector<uint8_t>& plainText,
-                     std::vector<uint8_t>& cipherText,
-                     std::vector<uint8_t>& tag);
-        void Decrypt(const std::vector<uint8_t>& cipherText,
-                     std::vector<uint8_t>& plainText,
-                     std::vector<uint8_t>& tag);
+        Crypt(AEAD aeadconfig, const Bytes& key);
+        void Encrypt(const Bytes& plainText,
+                     const Bytes& nonce,
+                     Bytes& cipherText,
+                     Bytes& tag);
+        void Decrypt(const Bytes& cipherText,
+                     Bytes& plainText,
+                     Bytes& tag);
                 
     private:
         AEAD aeadConfig;
-        std::vector<uint8_t> GenerateNonce();
-        std::vector<uint8_t> GenerateAAD();
+        Bytes key;
+        Bytes GenerateNonce();
+        Bytes GenerateAAD();
 
 
 };
