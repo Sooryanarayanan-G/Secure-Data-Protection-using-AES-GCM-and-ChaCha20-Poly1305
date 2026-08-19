@@ -10,6 +10,7 @@ class Serializer {
     public:
         std::vector<uint8_t> Serialize(const Record& record);
         Record Deserialize(std::vector<uint8_t> byteStream);
+        std::vector<uint8_t> GetAADBytes(uint32_t aad);
 };
 
 #endif

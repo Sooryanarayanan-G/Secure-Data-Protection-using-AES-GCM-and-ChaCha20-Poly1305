@@ -14,6 +14,8 @@ using namespace std;
 // A common file, to which the sender writes and the receiver reads from.
 std::string transportMediumSender = "tm.bin";
 
+uint32_t Sender::sendCount = 0;
+
 // Sender owns a Serializer and an Encrypter.
 Sender::Sender(AEAD aeadConfig, const vector<uint8_t>& key) 
     : serializer(), encrypter(aeadConfig, key) {
@@ -25,7 +27,9 @@ int Sender::SendRecord(Record& record) {
         ofstream file(transportMediumSender);
         if (file.is_open()) {
             vector<uint8_t> byteStream = serializer.Serialize(record);  // Serialization of record.
-            for (uint8_t byte: byteStream) {
+            vector<uint8_t> aadBytes = serializer.GetAADBytes(record.recId);
+            vector<uint8_t> secureByteStream = encrypter.Encrypt(byteStream, aadBytes); // Encryption of record.
+            for (uint8_t byte: secureByteStream) {
                 file.put(byte);
             }
         } else return 1;
@@ -39,7 +43,7 @@ int Sender::SendRecord(Record& record) {
 
 // Creates a record out of the data to be sent and the timestamp recorded.
 Record Sender::CreateRecord(const string& data, time_t timeStamp) {
-    Record record{timeStamp, data};
+    Record record{++sendCount, timeStamp, data};
     return record;
 }
 

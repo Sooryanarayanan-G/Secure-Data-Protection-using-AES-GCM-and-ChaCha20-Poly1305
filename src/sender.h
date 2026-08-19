@@ -9,6 +9,7 @@
 
 class Sender {
     private:
+        static uint32_t sendCount;
         Serializer serializer;
         Crypt encrypter;
         int SendRecord(Record& record);

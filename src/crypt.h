@@ -15,10 +15,8 @@ enum AEAD {
 class Crypt {
     public:
         Crypt(AEAD aeadconfig, const Bytes& key);
-        void Encrypt(const Bytes& plainText,
-                     const Bytes& nonce,
-                     Bytes& cipherText,
-                     Bytes& tag);
+        Bytes Encrypt(const Bytes& plainText,
+                     const Bytes& aad);
         void Decrypt(const Bytes& cipherText,
                      Bytes& plainText,
                      Bytes& tag);
@@ -26,9 +24,15 @@ class Crypt {
     private:
         AEAD aeadConfig;
         Bytes key;
-        Bytes GenerateNonce();
-        Bytes GenerateAAD();
-
+        Bytes GenerateNonce(AEAD aeadConfig);
+        bool EncryptAES_GCM(const Bytes& plainText, 
+                            const Bytes& aad,
+                            Bytes& cipherText, 
+                            Bytes& nonce,
+                            Bytes& tag);
+        bool EncryptChaCha_Poly(const Bytes& plainText, 
+                            Bytes& cipherText, 
+                            Bytes& tag);
 
 };
 

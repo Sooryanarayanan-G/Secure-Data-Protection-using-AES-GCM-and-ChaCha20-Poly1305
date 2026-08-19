@@ -42,6 +42,16 @@ Record Serializer::Deserialize(std::vector<uint8_t> byteStream) {
         data.push_back(static_cast<char> (byteStream[i]));
     }
 
-    Record record{timeStamp, data};
+    Record record{0, timeStamp, data};
     return record;
+}
+
+std::vector<uint8_t> Serializer::GetAADBytes(uint32_t aad) {
+    std::vector<uint8_t> byteStream;
+
+    for (int i = 0; i < 4; i ++) {
+        byteStream.push_back( (aad >> (24 - 8 * i) ) & 0xFF );
+    }
+
+    return byteStream;
 }
