@@ -18,7 +18,8 @@ using namespace std;
 
 Crypt::Crypt(AEAD aeadConfig, const vector<uint8_t>& userkey) {
     if ((aeadConfig == aes_128_gcm && userkey.size() != AES_KEY_SIZE) || 
-         (aeadConfig == chacha20_poly1305 && userkey.size() != CHACHAPOLY_KEY_SIZE)) {
+         (aeadConfig == chacha20_poly1305 && userkey.size() != CHACHA_POLY_KEY_SIZE)) {
+            std::cout << "keysize: " << userkey.size() << endl;
             throw std::runtime_error("Invalid key size\n");
     }; 
     this->key = userkey;
@@ -38,7 +39,7 @@ Bytes Crypt::Encrypt (const Bytes& plainText,
         break;
     
     case chacha20_poly1305:
-        encryptionFlag = EncryptChaCha_Poly(plainText, cipherText, tag);
+        encryptionFlag = EncryptChaCha_Poly(plainText, aad, cipherText, nonce, tag);
         break;
     } 
     
@@ -144,7 +145,7 @@ bool Crypt::EncryptChaCha_Poly(const Bytes& plainText,
 }   
 
 Bytes Crypt::GenerateNonce(AEAD aeadConfig) {
-    int nonceSize = (aeadConfig == aes_128_gcm) ? (AES_GCM_IV_LEN) : (CHACHA_POLY_NONCE_LEN)
+    int nonceSize = (aeadConfig == aes_128_gcm) ? (AES_GCM_IV_LEN) : (CHACHA_POLY_NONCE_LEN);
     Bytes nonce(nonceSize);
 
     if (RAND_bytes(nonce.data(), nonce.size()) != 1) {

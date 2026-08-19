@@ -31,7 +31,9 @@ class Crypt {
                             Bytes& nonce,
                             Bytes& tag);
         bool EncryptChaCha_Poly(const Bytes& plainText, 
-                            Bytes& cipherText, 
+                            const Bytes& aad,
+                            Bytes& cipherText,
+                            Bytes& nonce,
                             Bytes& tag);
 
 };

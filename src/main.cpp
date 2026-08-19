@@ -25,14 +25,14 @@ std::vector<uint8_t> GetKey(std::string filename) {
 
 int main(int argc, char* argv[]) {
     
-    if (argc != 3) {
-        std::cout << "Usage: ./a.out <data> <keyfile.bin>" << std::endl;
+    if (argc != 4) {
+        std::cout << "Usage: ./a.out <data> <enc-type> <keyfile.bin>" << std::endl;
         return 1;
     }
 
     std::string dataSent = argv[1];
-    std::vector<uint8_t> key = GetKey(argv[2]);
-    AEAD aeadConfig = aes_128_gcm;
+    std::vector<uint8_t> key = GetKey(argv[3]);
+    AEAD aeadConfig = (argv[2] == "aes") ? aes_128_gcm:chacha20_poly1305;
 
     // Sender and Receiver objects
     Sender senderObject (aeadConfig, key);
@@ -40,8 +40,8 @@ int main(int argc, char* argv[]) {
 
     senderObject.Send(dataSent);
     
-    std::string data = receiverObject.Receive();
-    std::cout << data << std::endl;
+    // std::string data = receiverObject.Receive();
+    // std::cout << data << std::endl;
 
     return 0;
 }  
