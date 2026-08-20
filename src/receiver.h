@@ -1,6 +1,7 @@
 #ifndef RECEIVER_H
 #define RECEIVER_H
 #include <string>
+#include <set>
 #include "record.h"
 #include "serializer.h"
 #include "crypt.h"
@@ -12,6 +13,7 @@ class Receiver {
 
     private:
         Crypt decrypter;
+        std::set<uint32_t> seenRecIds;
         int ConstructRecord(Record& record);
 };
 

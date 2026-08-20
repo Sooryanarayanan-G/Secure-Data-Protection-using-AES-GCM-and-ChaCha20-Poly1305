@@ -32,10 +32,19 @@ int Receiver::ConstructRecord(Record& record) {
             std::vector<uint8_t> byteStream(size);
             file.read((char*)byteStream.data(), size);
 
-            std::vector<uint8_t> plainText, tag;
-            decrypter.Decrypt(byteStream, plainText, tag);
+            std::vector<uint8_t> plainText, aad, tag;
+            decrypter.Decrypt(byteStream, plainText, aad, tag);
 
             record = serializer.Deserialize(plainText);
+            record.recId = serializer.GetRecIdFromAAD(aad);
+
+            // recId is authenticated via AAD, so a set of previously-accepted
+            // ids is a reliable replay check regardless of arrival order.
+            if (seenRecIds.count(record.recId)) {
+                throw std::runtime_error("Replay detected: record id already seen\n");
+            }
+            seenRecIds.insert(record.recId);
+
             return 0;
         }
     } catch (...) {

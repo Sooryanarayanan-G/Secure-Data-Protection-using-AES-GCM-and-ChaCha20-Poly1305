@@ -19,6 +19,7 @@ class Crypt {
                      const Bytes& aad);
         void Decrypt(const Bytes& cipherText,
                      Bytes& plainText,
+                     Bytes& aad,
                      Bytes& tag);
 
     private:

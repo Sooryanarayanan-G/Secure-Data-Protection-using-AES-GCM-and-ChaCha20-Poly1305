@@ -32,7 +32,7 @@ Crypt::Crypt(AEAD aeadConfig, const vector<uint8_t>& userkey) {
 Bytes Crypt::Encrypt (const Bytes& plainText,
                      const Bytes& aad) {
     
-    bool encryptionFlag;
+    bool encryptionFlag = false;
     Bytes nonce, cipherText, tag;
 
     switch (aeadConfig)
@@ -40,11 +40,11 @@ Bytes Crypt::Encrypt (const Bytes& plainText,
     case aes_128_gcm:
         encryptionFlag = EncryptAES_GCM(plainText, aad, cipherText, nonce, tag);
         break;
-    
+
     case chacha20_poly1305:
         encryptionFlag = EncryptChaCha_Poly(plainText, aad, cipherText, nonce, tag);
         break;
-    } 
+    }
     
     if (encryptionFlag == false) {
         std::cout << "Encryption Failure" << std::endl;
@@ -149,17 +149,18 @@ bool Crypt::EncryptChaCha_Poly(const Bytes& plainText,
 
 void Crypt::Decrypt(const Bytes& cipherText,
                      Bytes& plainText,
+                     Bytes& aad,
                      Bytes& tag) {
     if (cipherText.size() < AAD_LEN + NONCE_LEN + TAG_LEN) {
         throw std::runtime_error("Malformed secure stream\n");
     }
 
-    Bytes aad(cipherText.begin(), cipherText.begin() + AAD_LEN);
+    aad.assign(cipherText.begin(), cipherText.begin() + AAD_LEN);
     Bytes nonce(cipherText.begin() + AAD_LEN, cipherText.begin() + AAD_LEN + NONCE_LEN);
     Bytes actualCipherText(cipherText.begin() + AAD_LEN + NONCE_LEN, cipherText.end() - TAG_LEN);
     tag.assign(cipherText.end() - TAG_LEN, cipherText.end());
 
-    bool decryptionFlag;
+    bool decryptionFlag = false;
 
     switch (aeadConfig)
     {

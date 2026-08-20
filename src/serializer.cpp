@@ -55,3 +55,11 @@ std::vector<uint8_t> Serializer::GetAADBytes(uint32_t aad) {
 
     return byteStream;
 }
+
+uint32_t Serializer::GetRecIdFromAAD(const std::vector<uint8_t>& aad) {
+    uint32_t recId = 0;
+    for (int i = 0; i < 4; i++) {
+        recId = (recId << 8) | aad[i];
+    }
+    return recId;
+}
