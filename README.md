@@ -55,20 +55,43 @@ Individual targets: `make demo`, `make tests`, `make clean`.
 
 ### Interactive demo (`bin/demo`)
 
-Run from the `src/` directory so the relative key paths and the `tm.bin` transport
-medium resolve correctly:
+`send` and `recv` are separate commands (rather than one combined round trip) so you can
+inspect or tamper with `tm.bin` in between them. Run both from the `src/` directory so
+the relative key paths and the `tm.bin` transport medium resolve correctly:
 
 ```sh
 cd src
-../bin/demo "<data>" <aes|chacha> <keyfile.bin>
+
+# send: writes a protected record to tm.bin and stops
+../bin/demo send "<data>" <aes|chacha> <keyfile.bin>
+
+# recv: reads tm.bin, decrypts, verifies, and prints the recovered data
+# (or "Rejected: authentication or replay check failed." if verification fails)
+../bin/demo recv <aes|chacha> <keyfile.bin>
 
 # examples
-../bin/demo "hello world" aes ../keys/aeskey.bin
-../bin/demo "hello world" chacha ../keys/ccpkey.bin
+../bin/demo send "hello world" aes ../keys/aeskey.bin
+../bin/demo recv aes ../keys/aeskey.bin
+
+../bin/demo send "hello world" chacha ../keys/ccpkey.bin
+../bin/demo recv chacha ../keys/ccpkey.bin
 ```
 
 `keys/aeskey.bin` is a 16-byte key (AES-128-GCM); `keys/ccpkey.bin` is a 32-byte key
 (ChaCha20-Poly1305).
+
+To see the tamper/replay rejection paths yourself: after `send`, edit a byte of
+`tm.bin` before calling `recv`, e.g.
+
+```sh
+xxd tm.bin                                                    # inspect the layout
+printf '\xff' | dd of=tm.bin bs=1 seek=20 count=1 conv=notrunc status=none
+../bin/demo recv aes ../keys/aeskey.bin                        # now rejected
+```
+
+`tm.bin`'s layout is `AAD(4B) | nonce(12B) | ciphertext | tag(16B)` — offset `0` tampers
+the AAD, offset `16`+ tampers the ciphertext, and the final 16 bytes are the tag. Calling
+`recv` twice without an intervening `send` demonstrates replay rejection instead.
 
 ### Test suite (`bin/test_suite`)
 
