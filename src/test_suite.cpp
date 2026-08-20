@@ -129,16 +129,20 @@ static void RunTR7_NonceUniqueness(AEAD algo, int count) {
 
     for (int i = 0; i < count; i++) {
         sender.Send("nonce-test-record-" + to_string(i));
-
+        
         ifstream f(transportMedium, ios::binary);
         vector<uint8_t> nonce(WIRE_NONCE_LEN);
         f.seekg(WIRE_AAD_LEN);
         f.read((char*)nonce.data(), WIRE_NONCE_LEN);
-
+        
         if (!seenNonces.insert(nonce).second) {
             duplicateFound = true;
             break;
         }
+
+        // Optional print stmts to see that the program is still running properly
+        if (i > 0 && i % 1000 == 0)
+            std::cout << "No reuse detected till " << i <<"th iteration" << std::endl;
     }
 
     Report("TR-7", "Nonce uniqueness over " + to_string(count) + " records (" + AlgoName(algo) + ")",
