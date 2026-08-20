@@ -9,6 +9,10 @@
 
 std::string transportMediumReceiver = "tm.bin";
 
+Receiver::Receiver(AEAD aeadConfig, const std::vector<uint8_t>& key)
+    : decrypter(aeadConfig, key) {
+}
+
 std::string Receiver::Receive() {
     Record record{};
     int returnCode = ConstructRecord(record);
@@ -27,7 +31,11 @@ int Receiver::ConstructRecord(Record& record) {
 
             std::vector<uint8_t> byteStream(size);
             file.read((char*)byteStream.data(), size);
-            record = serializer.Deserialize(byteStream);
+
+            std::vector<uint8_t> plainText, tag;
+            decrypter.Decrypt(byteStream, plainText, tag);
+
+            record = serializer.Deserialize(plainText);
             return 0;
         }
     } catch (...) {

@@ -32,16 +32,16 @@ int main(int argc, char* argv[]) {
 
     std::string dataSent = argv[1];
     std::vector<uint8_t> key = GetKey(argv[3]);
-    AEAD aeadConfig = (argv[2] == "aes") ? aes_128_gcm:chacha20_poly1305;
+    AEAD aeadConfig = (std::string(argv[2]) == "aes") ? aes_128_gcm : chacha20_poly1305;
 
     // Sender and Receiver objects
     Sender senderObject (aeadConfig, key);
-    Receiver receiverObject;
+    Receiver receiverObject (aeadConfig, key);
 
     senderObject.Send(dataSent);
-    
-    // std::string data = receiverObject.Receive();
-    // std::cout << data << std::endl;
+
+    std::string data = receiverObject.Receive();
+    std::cout << data << std::endl;
 
     return 0;
-}  
+}
