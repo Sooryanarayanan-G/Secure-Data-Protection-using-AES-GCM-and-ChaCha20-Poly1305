@@ -2,3 +2,4 @@
 *.exe
 .vscode/
 *.bin
+bin/
