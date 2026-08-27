@@ -1,0 +1,21 @@
+\contentsline {section}{\numberline {1}Introduction}{2}{section.1}%
+\contentsline {section}{\numberline {2}Design Summary}{2}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Architecture}{2}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Wire Format}{2}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Nonce Management (FR-5 / SR-3)}{3}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Associated Data Selection (FR-4 / SR-4)}{3}{subsection.2.4}%
+\contentsline {subsection}{\numberline {2.5}Replay Handling Strategy (FR-8 / SR-5)}{3}{subsection.2.5}%
+\contentsline {subsection}{\numberline {2.6}Authentication Failure Handling (FR-7 / SR-6)}{3}{subsection.2.6}%
+\contentsline {subsection}{\numberline {2.7}Key Management (Out of Scope)}{3}{subsection.2.7}%
+\contentsline {section}{\numberline {3}Testing Methodology}{3}{section.3}%
+\contentsline {section}{\numberline {4}Testing Results}{4}{section.4}%
+\contentsline {subsection}{\numberline {4.1}TR-1 -- Positive Baseline Test}{4}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}TR-2 -- Ciphertext Integrity Test}{4}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}TR-3 -- Authentication Tag Test}{5}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}TR-4 -- Associated Data (AAD) Test}{5}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}TR-5 -- Replay Test}{5}{subsection.4.5}%
+\contentsline {subsection}{\numberline {4.6}TR-6 -- Wrong-Key Test}{6}{subsection.4.6}%
+\contentsline {subsection}{\numberline {4.7}TR-7 -- Nonce Management Verification}{6}{subsection.4.7}%
+\contentsline {section}{\numberline {5}Performance Analysis (TR-8)}{7}{section.5}%
+\contentsline {section}{\numberline {6}Discussion}{8}{section.6}%
+\contentsline {section}{\numberline {7}Conclusion}{9}{section.7}%

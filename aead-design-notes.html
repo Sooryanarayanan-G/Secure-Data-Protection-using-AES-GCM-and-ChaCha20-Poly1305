@@ -1,0 +1,659 @@
+<title>AEAD Secure Record Protocol — Design Notes</title>
+<style>
+  :root {
+    --bg: #F2F5F7;
+    --bg-panel: #E7ECEF;
+    --bg-code: #EAEEF1;
+    --text: #1C232B;
+    --text-muted: #52606D;
+    --accent: #9C5F29;
+    --accent-strong: #7E4A1F;
+    --accent-soft: #E9D9C5;
+    --accent2: #2A6F67;
+    --accent2-soft: #D9EAE7;
+    --border: #D3DBE0;
+    --danger: #A23B34;
+    --danger-soft: #F2DEDB;
+    --good: #2E7D4F;
+    --good-soft: #DCEEE1;
+    --shadow: 0 1px 2px rgba(28,35,43,0.06), 0 4px 16px rgba(28,35,43,0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10151B;
+      --bg-panel: #171E26;
+      --bg-code: #131A21;
+      --text: #DCE3EA;
+      --text-muted: #8B98A5;
+      --accent: #DDA35F;
+      --accent-strong: #EEC086;
+      --accent-soft: #3A2C1D;
+      --accent2: #5FBFB5;
+      --accent2-soft: #17302C;
+      --border: #29323C;
+      --danger: #E08880;
+      --danger-soft: #3A2220;
+      --good: #7CC79B;
+      --good-soft: #16281D;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10151B; --bg-panel: #171E26; --bg-code: #131A21; --text: #DCE3EA;
+    --text-muted: #8B98A5; --accent: #DDA35F; --accent-strong: #EEC086;
+    --accent-soft: #3A2C1D; --accent2: #5FBFB5; --accent2-soft: #17302C;
+    --border: #29323C; --danger: #E08880; --danger-soft: #3A2220;
+    --good: #7CC79B; --good-soft: #16281D;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  :root[data-theme="light"] {
+    --bg: #F2F5F7; --bg-panel: #E7ECEF; --bg-code: #EAEEF1; --text: #1C232B;
+    --text-muted: #52606D; --accent: #9C5F29; --accent-strong: #7E4A1F;
+    --accent-soft: #E9D9C5; --accent2: #2A6F67; --accent2-soft: #D9EAE7;
+    --border: #D3DBE0; --danger: #A23B34; --danger-soft: #F2DEDB;
+    --good: #2E7D4F; --good-soft: #DCEEE1;
+    --shadow: 0 1px 2px rgba(28,35,43,0.06), 0 4px 16px rgba(28,35,43,0.05);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, "Noto Serif", serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 0;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  nav.toc {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 2.5rem 1.25rem 2rem 1.5rem;
+    border-right: 1px solid var(--border);
+    font-family: ui-sans-serif, "IBM Plex Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  nav.toc .brand {
+    font-family: Charter, Georgia, serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
+    margin: 0 0 0.15rem;
+  }
+  nav.toc .brand-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin: 0 0 1.75rem;
+  }
+  nav.toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: toc;
+  }
+  nav.toc li { margin: 0; }
+  nav.toc a {
+    counter-increment: toc;
+    display: block;
+    padding: 0.32rem 0;
+    font-size: 0.86rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    padding-left: 0.7rem;
+    margin-left: -0.85rem;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); border-left-color: var(--accent); }
+  nav.toc a::before {
+    content: counter(toc, decimal-leading-zero) " ";
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    color: var(--accent2);
+    font-size: 0.78rem;
+    margin-right: 0.35rem;
+  }
+
+  main {
+    padding: 3.2rem clamp(1.5rem, 4vw, 4rem) 6rem;
+    min-width: 0;
+  }
+  header.hero {
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.74rem;
+    color: var(--accent2);
+    margin: 0 0 0.9rem;
+  }
+  h1 {
+    font-family: Charter, "Iowan Old Style", Georgia, serif;
+    font-size: clamp(2rem, 4vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.9rem;
+    text-wrap: balance;
+  }
+  header.hero p.lede {
+    font-size: 1.12rem;
+    color: var(--text-muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+  section { margin-bottom: 3.6rem; scroll-margin-top: 1.5rem; }
+  section > h2 {
+    font-family: Charter, Georgia, serif;
+    font-size: 1.55rem;
+    letter-spacing: -0.005em;
+    margin: 0 0 0.3rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+  section > h2 .num {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    color: var(--accent2);
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+  section > p.dek {
+    color: var(--text-muted);
+    margin: 0 0 1.4rem;
+    max-width: 68ch;
+    font-size: 1rem;
+  }
+  h3 {
+    font-family: ui-sans-serif, "IBM Plex Sans", "Segoe UI", sans-serif;
+    font-size: 1.02rem;
+    font-weight: 650;
+    margin: 1.8rem 0 0.6rem;
+    color: var(--text);
+  }
+  p { max-width: 70ch; margin: 0 0 1rem; }
+  ul, ol.steps { max-width: 70ch; padding-left: 1.3rem; }
+  li { margin-bottom: 0.4rem; }
+  a { color: var(--accent); }
+  strong { font-weight: 700; }
+  code, kbd {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.87em;
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+  }
+
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.1rem 1.3rem;
+    margin: 1.1rem 0 1.4rem;
+    box-shadow: var(--shadow);
+  }
+
+  pre {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.83rem;
+    line-height: 1.55;
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 1rem 0 1.4rem;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: 0.83rem; }
+
+  .table-wrap { overflow-x: auto; margin: 1rem 0 1.6rem; border: 1px solid var(--border); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 0.92rem; }
+  caption { caption-side: top; text-align: left; font-size: 0.8rem; color: var(--text-muted); padding: 0.6rem 0.9rem 0; font-family: ui-sans-serif, sans-serif; }
+  thead th {
+    font-family: ui-sans-serif, "IBM Plex Sans", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+  }
+  td {
+    padding: 0.65rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    font-variant-numeric: tabular-nums;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.chosen { color: var(--good); font-weight: 650; }
+  tr.chosen-row td:first-child { border-left: 3px solid var(--good); }
+
+  .pill {
+    display: inline-block;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 99px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    margin: 0 0.3rem 0.3rem 0;
+    border: 1px solid transparent;
+  }
+  .pill.req { background: var(--accent2-soft); color: var(--accent2); }
+
+  .callout {
+    display: flex;
+    gap: 0.8rem;
+    padding: 1rem 1.2rem;
+    border-radius: 10px;
+    margin: 1.2rem 0 1.5rem;
+    border: 1px solid var(--border);
+    font-size: 0.95rem;
+  }
+  .callout.why { background: var(--accent2-soft); border-color: color-mix(in srgb, var(--accent2) 35%, var(--border)); }
+  .callout.limit { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); }
+  .callout .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 650;
+    white-space: nowrap;
+    padding-top: 0.15rem;
+  }
+  .callout.why .tag { color: var(--accent2); }
+  .callout.limit .tag { color: var(--danger); }
+  .callout p { margin: 0; max-width: 62ch; }
+
+  ol.steps { list-style: none; padding: 0; counter-reset: step; }
+  ol.steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 2.6rem;
+    margin-bottom: 1rem;
+  }
+  ol.steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 0;
+    width: 1.9rem; height: 1.9rem;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  ol.steps code { display: block; margin-top: 0.3rem; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.3rem; margin: 1.2rem 0 1.6rem; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+  .grid2 .panel { margin: 0; }
+  .grid2 h4 { margin: 0 0 0.5rem; font-family: ui-sans-serif, sans-serif; font-size: 0.95rem; }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-family: ui-sans-serif, sans-serif;
+  }
+
+  @media (max-width: 880px) {
+    .shell { grid-template-columns: 1fr; }
+    nav.toc { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Table of contents">
+    <p class="brand">AEAD Secure Record Protocol</p>
+    <p class="brand-sub">Design notes &amp; alternatives</p>
+    <ol>
+      <li><a href="#overview">What this project is</a></li>
+      <li><a href="#architecture">Architecture at a glance</a></li>
+      <li><a href="#dataflow">End-to-end data flow</a></li>
+      <li><a href="#aead">AEAD from first principles</a></li>
+      <li><a href="#aesgcm">AES-128-GCM internals</a></li>
+      <li><a href="#chacha">ChaCha20-Poly1305 internals</a></li>
+      <li><a href="#wireformat">Wire format design</a></li>
+      <li><a href="#nonce">Nonce management</a></li>
+      <li><a href="#aad">Associated Data design</a></li>
+      <li><a href="#replay">Replay protection</a></li>
+      <li><a href="#failclosed">Authentication-failure handling</a></li>
+      <li><a href="#keys">Key management (out of scope)</a></li>
+      <li><a href="#testing">Testing strategy</a></li>
+      <li><a href="#performance">Performance results</a></li>
+      <li><a href="#coverage">Requirement coverage map</a></li>
+      <li><a href="#limits">Limitations &amp; what's next</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <p class="eyebrow">CS6530 · Applied Cryptography · Assignment 1</p>
+      <h1>Secure Data Protection using AES-GCM and ChaCha20-Poly1305</h1>
+      <p class="lede">A design-decision reference for the sender/receiver AEAD subsystem in this repository — what was built, the reasoning behind each choice, and the alternatives that were on the table but not taken.</p>
+    </header>
+
+    <section id="overview">
+      <h2><span class="num">01</span> What this project is</h2>
+      <p>The codebase simulates two parties — a <code>Sender</code> and a <code>Receiver</code> — exchanging small structured messages (<code>Record</code>s) over a channel that cannot be trusted to preserve confidentiality or integrity. Rather than inventing a cryptographic primitive, the assignment's point is <strong>secure engineering</strong>: correctly composing an existing AEAD primitive (AES-128-GCM or ChaCha20-Poly1305, both via OpenSSL's EVP API) into a protocol that also handles nonce management, associated data, and replay — the parts that don't come for free just because you called <code>EVP_EncryptUpdate</code>.</p>
+      <div class="callout why">
+        <span class="tag">Why it matters</span>
+        <p>Most real-world crypto failures aren't broken ciphers — they're broken protocol logic around a correct cipher: reused nonces, unauthenticated headers, replayed messages, or errors that leak plaintext before verification finishes. This project's structure exists specifically to force those decisions into the open.</p>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <h2><span class="num">02</span> Architecture at a glance</h2>
+      <p class="dek">Five small classes, each owning exactly one concern, wired together by two orchestrators.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Class</th><th>Owns</th><th>Deliberately does <em>not</em> know about</th></tr></thead>
+          <tbody>
+            <tr><td><code>Record</code></td><td>The message shape: id, timestamp, payload</td><td>Bytes, encryption, files</td></tr>
+            <tr><td><code>Serializer</code></td><td>Fixed-width <code>Record</code> ⇄ byte encoding</td><td>Cryptography</td></tr>
+            <tr><td><code>Crypt</code></td><td>AEAD engine — wire format, nonce generation, encrypt/decrypt for both algorithms</td><td><code>Record</code>, files, the concept of a "sender"</td></tr>
+            <tr><td><code>Sender</code></td><td>Build record → serialize → encrypt → write channel</td><td>How encryption or serialization work internally</td></tr>
+            <tr><td><code>Receiver</code></td><td>Read channel → decrypt → verify → replay-check → deserialize</td><td>How encryption or serialization work internally</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout why">
+        <span class="tag">Why this layering</span>
+        <p>The alternative — one class that reads a string, encrypts it, and writes a file — would be shorter, but it collapses "what is a message" (a domain concept) into "how is it protected" (a cryptography concept). Keeping <code>Crypt</code> ignorant of <code>Record</code> means the AEAD engine is independently testable and reusable for any byte blob, which is exactly what <code>test_suite.cpp</code> exploits by calling <code>Crypt::Encrypt</code>/<code>Decrypt</code> directly for the performance benchmarks, bypassing serialization entirely.</p>
+      </div>
+    </section>
+
+    <section id="dataflow">
+      <h2><span class="num">03</span> End-to-end data flow</h2>
+      <p class="dek">What happens between <code>sender.Send("hello")</code> and the string reappearing at <code>receiver.Receive()</code>.</p>
+      <ol class="steps">
+        <li><strong>Build the record.</strong> <code>Sender::CreateRecord</code> assigns the next sequence id (a process-wide monotonic counter) and the current timestamp.
+          <code>Record{ recId, timestamp, data }</code></li>
+        <li><strong>Serialize.</strong> <code>Serializer::Serialize</code> packs <code>timestamp</code> and <code>data</code> into a fixed-width byte layout — <em>not</em> a raw <code>memcpy</code> of the struct, because struct layout isn't portable across compilers/platforms.
+          <code>[8B timestamp][4B length][N bytes payload]</code></li>
+        <li><strong>Split off the AAD.</strong> The record id is <em>not</em> serialized into the payload — it's encoded separately via <code>GetAADBytes()</code> and fed to the cipher as Associated Data instead of as plaintext.</li>
+        <li><strong>Encrypt.</strong> <code>Crypt::Encrypt</code> generates a fresh random nonce, runs the selected AEAD cipher over the serialized bytes with the AAD bound in, and returns ciphertext + tag.</li>
+        <li><strong>Frame the wire format.</strong> The four artifacts are concatenated into one blob.
+          <code>secureStream = AAD(4B) || nonce(12B) || ciphertext || tag(16B)</code></li>
+        <li><strong>Cross the channel.</strong> <code>Sender</code> writes the blob to <code>tm.bin</code> — standing in for a socket, queue, or disk handoff.</li>
+        <li><strong>Parse the wire format.</strong> <code>Crypt::Decrypt</code> slices the blob back into AAD / nonce / ciphertext / tag using the same fixed offsets.</li>
+        <li><strong>Decrypt + authenticate.</strong> The cipher recomputes the tag over the ciphertext and AAD and compares it to the received tag <em>before</em> releasing any plaintext. Mismatch → exception, nothing returned.</li>
+        <li><strong>Check for replay.</strong> <code>Receiver</code> decodes the recId from the now-trusted AAD and rejects it if that id has been accepted before.</li>
+        <li><strong>Deserialize.</strong> <code>Serializer::Deserialize</code> turns the verified plaintext back into a <code>Record</code>, which <code>Receiver::Receive</code> hands back as a plain string.</li>
+      </ol>
+    </section>
+
+    <section id="aead">
+      <h2><span class="num">04</span> AEAD, from first principles</h2>
+      <p class="dek">Why the assignment insists on AEAD specifically, rather than "encryption" in general.</p>
+      <p>Plain encryption (e.g. AES-CTR alone) gives confidentiality but not integrity — an attacker who can't read the plaintext can still flip bits in the ciphertext and produce a predictably corrupted plaintext on the other end, which is exactly how bit-flipping attacks against unauthenticated stream ciphers work. The historical fix was to bolt a MAC onto an encryption scheme, and there are three ways to combine them:</p>
+      <div class="table-wrap">
+        <table>
+          <caption>Composition strategies for confidentiality + integrity</caption>
+          <thead><tr><th>Scheme</th><th>MAC computed over</th><th>Known weakness</th></tr></thead>
+          <tbody>
+            <tr><td>Encrypt-and-MAC</td><td>Plaintext</td><td>MAC can leak plaintext info (used in SSH); doesn't guarantee ciphertext integrity</td></tr>
+            <tr><td>MAC-then-Encrypt</td><td>Plaintext, then MAC+plaintext both encrypted</td><td>Padding-oracle attacks (the class of bug that broke early TLS/SSL CBC modes)</td></tr>
+            <tr><td>Encrypt-then-MAC</td><td>Ciphertext</td><td>Provably secure if done correctly, but easy to implement wrong (nonce reuse, MAC omitted on associated data)</td></tr>
+            <tr class="chosen-row"><td class="chosen">AEAD (GCM / Poly1305)</td><td>Ciphertext <em>and</em> unencrypted associated data, as one atomic primitive</td><td>Still fails badly on nonce reuse — but there's only one primitive to get right, not two composed independently</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout why">
+        <span class="tag">Why AEAD won</span>
+        <p>AEAD collapses "encrypt correctly" and "MAC correctly, over the right data, without leaking a timing oracle" into a single library call, which is precisely what the assignment brief means by "the emphasis is on correctly integrating these algorithms" rather than composing primitives by hand.</p>
+      </div>
+    </section>
+
+    <section id="aesgcm">
+      <h2><span class="num">05</span> AES-128-GCM internals</h2>
+      <p class="dek">What <code>EVP_aes_128_gcm()</code> is actually doing.</p>
+      <p>GCM (Galois/Counter Mode) is AES run in <strong>CTR mode</strong> for encryption — the block cipher generates a keystream by encrypting a counter derived from the nonce, and that keystream is XORed with plaintext, making it a stream cipher built from a block cipher. Authentication is layered on top via <strong>GHASH</strong>, a universal hash function over GF(2¹²⁸) that processes the AAD and ciphertext to produce the tag. This is why the OpenSSL calls for AES-GCM look almost identical to a stream cipher API (<code>EVP_EncryptUpdate</code> for data, a separate <code>_ctrl</code> call to fetch the tag) rather than a block-padding API.</p>
+      <div class="table-wrap">
+        <table>
+          <caption>Alternative AES-based AEAD modes not used here</caption>
+          <thead><tr><th>Mode</th><th>Tradeoff vs GCM</th></tr></thead>
+          <tbody>
+            <tr class="chosen-row"><td class="chosen">GCM (chosen)</td><td>Hardware-accelerated on any CPU with AES-NI + PCLMULQDQ; the de facto default (TLS 1.3, IPsec, SSH)</td></tr>
+            <tr><td>CCM</td><td>No hardware GHASH acceleration; two passes over the data (CBC-MAC then CTR) — used mainly in constrained IoT (802.15.4/Zigbee)</td></tr>
+            <tr><td>SIV (Synthetic IV)</td><td>Nonce-<em>misuse resistant</em> — safe even if a nonce repeats — but requires two passes and isn't part of the standard EVP one-shot streaming API</td></tr>
+            <tr><td>AES-CBC + HMAC (manual)</td><td>What GCM replaced; requires the encrypt-then-MAC discipline above, and CBC needs padding, opening padding-oracle risk</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="chacha">
+      <h2><span class="num">06</span> ChaCha20-Poly1305 internals</h2>
+      <p class="dek">Why the assignment asks for a second, structurally different algorithm rather than a second AES mode.</p>
+      <p>ChaCha20 is a pure software stream cipher — it never needs a lookup table or dedicated silicon to run at speed, because it's built entirely from add-rotate-XOR (ARX) operations on 32-bit words. That also makes it inherently free of the cache-timing side channels that plagued naive AES table-lookup implementations before AES-NI existed. Poly1305 is a polynomial MAC evaluated in GF(2¹³⁰−5) rather than GF(2¹²⁸) — a completely different mathematical construction from GHASH, computed once per message from a one-time key derived from the ChaCha20 keystream's first block (RFC 8439's construction, which is what OpenSSL's <code>EVP_chacha20_poly1305()</code> implements).</p>
+      <div class="callout why">
+        <span class="tag">Why it's the second algorithm here</span>
+        <p>The assignment wants a genuine comparison, not two flavors of the same design. AES-GCM depends on hardware acceleration to be fast and constant-time; ChaCha20-Poly1305 is fast and constant-time <em>everywhere</em>, including phones and embedded cores without AES-NI. That's a real, measurable engineering tradeoff — see <a href="#performance">§14</a> — not just a policy choice.</p>
+      </div>
+    </section>
+
+    <section id="wireformat">
+      <h2><span class="num">07</span> Wire format design</h2>
+      <p class="dek">Why <code>AAD || nonce || ciphertext || tag</code>, concatenated with fixed widths, instead of something more self-describing.</p>
+      <pre><code>Offset  0        4              16                   len-16        len
+        +--------+--------------+--------------------+-------------+
+        | AAD    | nonce        | ciphertext          | tag         |
+        | 4 bytes| 12 bytes     | variable             | 16 bytes    |
+        +--------+--------------+--------------------+-------------+</code></pre>
+      <div class="table-wrap">
+        <table>
+          <caption>Framing alternatives considered</caption>
+          <thead><tr><th>Approach</th><th>Tradeoff</th></tr></thead>
+          <tbody>
+            <tr class="chosen-row"><td class="chosen">Fixed-width concatenation (chosen)</td><td>Zero parsing ambiguity, no extra bytes spent on length prefixes — but only works because every field <em>except</em> ciphertext has a length fixed by the algorithm choice</td></tr>
+            <tr><td>Length-prefixed TLV</td><td>Self-describing and extensible (can add fields later without breaking old parsers) — costs a few bytes per record and a bit more parsing code; the standard choice for a real wire protocol</td></tr>
+            <tr><td>Structured envelope (protobuf / JSON+base64)</td><td>Versionable and language-agnostic, natural if sender/receiver were separate services — pure overhead for a single-process file handoff</td></tr>
+            <tr><td>Out-of-band header</td><td>AAD/nonce sent via a separate channel or fixed protocol field (this is what TLS records and IPsec ESP actually do) — avoids re-deriving offsets, but there's no "protocol field" to reuse here</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The fixed-width scheme is only safe because the ciphertext is the <em>last</em> variable-length field before a fixed-length tag — if two variable-length fields existed, positional slicing would be ambiguous and a length prefix would become mandatory.</p>
+    </section>
+
+    <section id="nonce">
+      <h2><span class="num">08</span> Nonce management</h2>
+      <p class="dek">FR-5 / SR-3: correctly manage nonces, and never reuse one with the same key.</p>
+      <p><code>Crypt::GenerateNonce</code> draws a fresh 96-bit value from <code>RAND_bytes</code> (OpenSSL's CSPRNG) for <em>every single call</em> to <code>Encrypt</code> — nothing is cached or derived from a counter. This is the standard, simplest-to-get-right nonce strategy for both GCM and ChaCha20-Poly1305, which is why both ciphers standardize on a 96-bit nonce in the first place.</p>
+      <div class="table-wrap">
+        <table>
+          <caption>Nonce strategies compared</caption>
+          <thead><tr><th>Strategy</th><th>Reuse risk</th><th>Cost</th></tr></thead>
+          <tbody>
+            <tr class="chosen-row"><td class="chosen">Random 96-bit (chosen)</td><td>Birthday-bound collision risk grows past ≈2³² messages under one key</td><td>None — no shared state between sender calls</td></tr>
+            <tr><td>Monotonic counter</td><td>Zero collision risk by construction, <em>if</em> state is durable</td><td>Sender must persist the counter across restarts, or a crash-and-reuse bug silently breaks security</td></tr>
+            <tr><td>XChaCha20-Poly1305 (192-bit nonce)</td><td>Random nonces become safe up to ≈2⁹⁶ messages — the birthday bound moves out of reach</td><td>Not in the assignment's two required configurations; would need a different EVP cipher (<code>EVP_chacha20_poly1305</code> doesn't have an X-variant in stock OpenSSL 3.x)</td></tr>
+            <tr><td>Partitioned counter (multi-sender)</td><td>Zero risk across senders sharing a key, via a fixed sender-id prefix + local counter</td><td>Extra coordination/allocation of the id space; the pattern used by QUIC and IPsec SAs</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout why">
+        <span class="tag">Why random over counter</span>
+        <p>A counter is safer in the limit but only if it survives a crash — get that wrong and you get catastrophic, silent nonce reuse. Random nonces degrade gracefully (the risk is probabilistic and bounded, not a hard failure mode) and need zero persisted state, which matches the assignment's message volume (TR-7 asks for ~10,000 records — nowhere near the 2³² birthday bound) far better than the operational complexity a durable counter would add for a demo subsystem.</p>
+      </div>
+      <p><code>test_suite.cpp</code>'s TR-7 test empirically checks this: it sends 10,000 records under one key and collects every nonce into a <code>std::set</code>, asserting the set's size stays at 10,000 (i.e., zero collisions observed).</p>
+    </section>
+
+    <section id="aad">
+      <h2><span class="num">09</span> Associated Data design</h2>
+      <p class="dek">FR-4 / SR-4: what gets authenticated but not encrypted, and why it's just the record id.</p>
+      <p>The 4-byte record id is bound into the tag as AAD via <code>Serializer::GetAADBytes</code>. It stays visible in plaintext on the wire (record ids usually aren't secret) but can't be detached from its ciphertext or swapped for another record's id without invalidating the tag.</p>
+      <div class="table-wrap">
+        <table>
+          <caption>What could have been chosen as AAD</caption>
+          <thead><tr><th>AAD content</th><th>What it protects</th><th>Cost</th></tr></thead>
+          <tbody>
+            <tr class="chosen-row"><td class="chosen">Record id only (chosen)</td><td>Binds ciphertext to its sequence position — enables replay detection</td><td>Minimal; 4 bytes</td></tr>
+            <tr><td>No AAD</td><td>Nothing beyond the payload itself</td><td>Cheapest, but nothing stops a valid ciphertext from being replayed under a different apparent sequence number</td></tr>
+            <tr><td>Full header (id + timestamp + sender identity)</td><td>Also authenticates freshness and origin, closer to what a real transport protocol (e.g. a TLS record header) authenticates</td><td>More AAD bytes to transmit in the clear; timestamp freshness checks need clock-sync assumptions this assignment explicitly places out of scope</td></tr>
+            <tr><td>Application-level context (e.g. session id, channel id)</td><td>Prevents cross-context ciphertext splicing when one key is shared across multiple logical streams</td><td>Not applicable — this design uses one key per <code>Crypt</code> instance / one logical channel</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="replay">
+      <h2><span class="num">10</span> Replay protection</h2>
+      <p class="dek">FR-8 / SR-5 / TR-5 — the piece that was entirely missing before this session's changes.</p>
+      <p><code>Receiver</code> keeps a <code>std::set&lt;uint32_t&gt; seenRecIds</code>. After a record decrypts and authenticates, its id (recovered from the now-trusted AAD) is checked against the set; a repeat is rejected before <code>Receive()</code> ever returns data.</p>
+      <div class="table-wrap">
+        <table>
+          <caption>Replay-detection strategies compared</caption>
+          <thead><tr><th>Strategy</th><th>Handles out-of-order delivery?</th><th>Memory profile</th><th>Real-world analogue</th></tr></thead>
+          <tbody>
+            <tr class="chosen-row"><td class="chosen">Seen-id set (chosen)</td><td>Yes — any id, any order, exactly once</td><td>Unbounded — grows with every accepted record for the session's lifetime</td><td>—</td></tr>
+            <tr><td>Monotonic counter (reject id ≤ last seen)</td><td>No — legitimately reordered records are also rejected</td><td>O(1) — a single integer</td><td>Not standard alone; usually paired with a window (below)</td></tr>
+            <tr><td>Sliding window (accept a bounded range, bitmap for the window)</td><td>Yes, within the window width</td><td>O(window size) — bounded and small</td><td>TLS 1.3 record replay window; IPsec ESP anti-replay window</td></tr>
+            <tr><td>Timestamp freshness (reject if outside ±Δ of now)</td><td>Yes, within Δ</td><td>O(1) if combined with a short-lived seen-cache</td><td>Kerberos ticket freshness; needs synchronized clocks</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout why">
+        <span class="tag">Why an unbounded set, here</span>
+        <p>A sliding window is the production-grade answer — it's what TLS and IPsec actually ship, because an unbounded set is a memory-exhaustion liability over a long-lived connection. It was skipped here because the assignment's scope is a session-bounded demonstration (thousands of records, not an always-on service), and a plain set makes the <em>correctness property</em> — "no id is ever accepted twice" — visually obvious in the code and trivial to verify in TR-5, rather than being an artifact of a window size choice.</p>
+      </div>
+      <div class="callout limit">
+        <span class="tag">Worth flagging in the report</span>
+        <p>This is a legitimate scoping tradeoff to name explicitly in the Assignment 1 Report's Discussion section — "unbounded seen-set, sufficient for this demonstration's message volume; a sliding window would be required for a long-running service" is exactly the kind of documented assumption FR-10 asks for.</p>
+      </div>
+    </section>
+
+    <section id="failclosed">
+      <h2><span class="num">11</span> Authentication-failure handling</h2>
+      <p class="dek">FR-7 / SR-6 — reject bad records without ever releasing recovered plaintext.</p>
+      <p>OpenSSL's decrypt API is asymmetric on purpose: <code>EVP_DecryptUpdate</code> will happily emit <em>some</em> bytes even for a tampered ciphertext — the tag check only happens at <code>EVP_DecryptFinal_ex</code>, which returns ≤0 on mismatch. <code>Crypt::Decrypt</code> treats that as the single point of truth and throws <code>std::runtime_error</code> rather than returning a flag, which forces every caller up the chain to either handle the failure explicitly or let the record be dropped — there's no code path where a caller can accidentally read the reference-passed <code>plainText</code> buffer after a failed verification, because the exception unwinds before <code>Receiver::ConstructRecord</code> reaches the line that would use it.</p>
+      <div class="callout why">
+        <span class="tag">Why exceptions over a return code</span>
+        <p>A boolean/error-code return is easy to silently ignore (<code>if (ok) { ... }</code> without an <code>else</code> is a compiling, plausible-looking bug). An uncaught exception crashes loudly; a caught one forces a conscious decision at the catch site. <code>Receiver::ConstructRecord</code>'s <code>catch (...)</code> is that conscious decision — "any failure in this block means reject the record," which is the fail-closed posture SR-6 requires.</p>
+      </div>
+    </section>
+
+    <section id="keys">
+      <h2><span class="num">12</span> Key management — explicitly out of scope</h2>
+      <p class="dek">The assignment states the sender and receiver already share a secret key; this project reads that key from a file.</p>
+      <p><code>keys/aeskey.bin</code> (16 bytes) and <code>keys/ccpkey.bin</code> (32 bytes) are read raw from disk by <code>main.cpp</code>'s <code>GetKey</code>. For context — not because it needed implementing here — real systems get that shared key one of a few ways:</p>
+      <div class="grid2">
+        <div class="panel"><h4>Pre-shared key (used here)</h4><p style="margin:0">Provisioned out-of-band before any communication. Simple, but doesn't scale past a small, fixed set of parties and has no forward secrecy if the key ever leaks.</p></div>
+        <div class="panel"><h4>Key exchange (Diffie–Hellman / X3DH)</h4><p style="margin:0">Derives a fresh shared secret per session over an insecure channel. What TLS and Signal actually do; explicitly named as a later-course topic in the assignment brief.</p></div>
+        <div class="panel"><h4>KDF from a master secret</h4><p style="margin:0">One long-term key plus <code>HKDF</code> derives per-purpose subkeys (e.g. separate keys for AES-GCM vs ChaCha20 configurations) — avoids ever reusing raw key material across algorithms.</p></div>
+        <div class="panel"><h4>KMS / HSM-backed key</h4><p style="margin:0">Key material never leaves a hardware boundary; the application calls an API to encrypt/decrypt rather than holding raw bytes. Standard for production cloud services.</p></div>
+      </div>
+    </section>
+
+    <section id="testing">
+      <h2><span class="num">13</span> Testing strategy</h2>
+      <p class="dek">How <code>test_suite.cpp</code> demonstrates TR-1 through TR-8 without a real network.</p>
+      <p>The assignment allows the three logical roles (sender, malicious actor, receiver) to live inside one process, "provided that all Functional and Testing Requirements are satisfied." <code>test_suite.cpp</code> takes that option: the "malicious actor" is a function that opens <code>tm.bin</code> after a legitimate <code>Send()</code> and flips one byte at a computed offset — position <code>16</code> for ciphertext (TR-2), the final byte for the tag (TR-3), byte <code>0</code> for the AAD (TR-4).</p>
+      <div class="table-wrap">
+        <table>
+          <caption>Testing Requirement → mechanism</caption>
+          <thead><tr><th>TR</th><th>Mechanism</th><th>Pass condition</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill req">TR-1</span></td><td>Plain send + receive</td><td>Recovered string equals the original</td></tr>
+            <tr><td><span class="pill req">TR-2</span></td><td>Flip byte 16 (first ciphertext byte)</td><td><code>Receive()</code> returns empty</td></tr>
+            <tr><td><span class="pill req">TR-3</span></td><td>Flip the last byte (inside the tag)</td><td><code>Receive()</code> returns empty</td></tr>
+            <tr><td><span class="pill req">TR-4</span></td><td>Flip byte 0 (inside the AAD)</td><td><code>Receive()</code> returns empty</td></tr>
+            <tr><td><span class="pill req">TR-5</span></td><td>Call <code>Receive()</code> twice on one send</td><td>First call succeeds, second is rejected as a replay</td></tr>
+            <tr><td><span class="pill req">TR-6</span></td><td>Decrypt with a same-length, different-content key</td><td><code>Receive()</code> returns empty</td></tr>
+            <tr><td><span class="pill req">TR-7</span></td><td>10,000 sends under one key; collect nonces into a <code>std::set</code></td><td>Set size stays at 10,000 (no collisions)</td></tr>
+            <tr><td><span class="pill req">TR-8</span></td><td>Time <code>Crypt::Encrypt</code>/<code>Decrypt</code> directly at 64B/1KiB/64KiB</td><td>Comparative timing table (not pass/fail)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout why">
+        <span class="tag">Why byte-flip a file instead of a real MITM</span>
+        <p>A genuine network-level attacker would intercept a socket write; flipping a byte in the shared file achieves the identical adversary model — "the attacker can modify bytes in transit" — without the assignment's added complexity of standing up sockets or processes, which the brief explicitly says isn't required ("network communication is optional").</p>
+      </div>
+      <div class="callout limit">
+        <span class="tag">Scoping note for TR-8</span>
+        <p>Performance is measured on <code>Crypt::Encrypt</code>/<code>Decrypt</code> directly, bypassing <code>Sender</code>/<code>Receiver</code>'s file I/O. Going through the full file-based pipeline would work too, but disk I/O time would dominate and mask the actual cost difference between the two ciphers — worth stating as an assumption in the report.</p>
+      </div>
+    </section>
+
+    <section id="performance">
+      <h2><span class="num">14</span> Performance results</h2>
+      <p class="dek">TR-8, run locally via <code>make run-tests</code>. Numbers are one sample run on this machine — re-run for the report, hardware varies.</p>
+      <div class="table-wrap">
+        <table>
+          <caption>Encrypt/decrypt cost by payload size</caption>
+          <thead><tr><th>Algorithm</th><th>Size</th><th>Encrypt</th><th>Decrypt</th><th>Enc throughput</th><th>Dec throughput</th></tr></thead>
+          <tbody>
+            <tr><td>AES-128-GCM</td><td>64 B</td><td>2.87 µs</td><td>1.38 µs</td><td>21.3 MB/s</td><td>44.1 MB/s</td></tr>
+            <tr><td>ChaCha20-Poly1305</td><td>64 B</td><td>2.39 µs</td><td>1.41 µs</td><td>25.5 MB/s</td><td>43.3 MB/s</td></tr>
+            <tr><td>AES-128-GCM</td><td>1 KiB</td><td>3.33 µs</td><td>1.62 µs</td><td>293.1 MB/s</td><td>602.9 MB/s</td></tr>
+            <tr><td>ChaCha20-Poly1305</td><td>1 KiB</td><td>4.11 µs</td><td>3.27 µs</td><td>237.6 MB/s</td><td>298.3 MB/s</td></tr>
+            <tr><td>AES-128-GCM</td><td>64 KiB</td><td>66.4 µs</td><td>34.3 µs</td><td>940.9 MB/s</td><td>1824.4 MB/s</td></tr>
+            <tr><td>ChaCha20-Poly1305</td><td>64 KiB</td><td>132.3 µs</td><td>75.3 µs</td><td>472.6 MB/s</td><td>829.6 MB/s</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>At 64 bytes the two are within noise of each other — fixed per-call overhead (context setup, a handful of AES/ChaCha rounds) dominates at that size, not the cipher's steady-state throughput. By 1 KiB and clearly by 64 KiB, AES-128-GCM pulls roughly 2× ahead.</p>
+      <div class="callout why">
+        <span class="tag">Why AES-GCM wins on this machine</span>
+        <p>This CPU has <strong>AES-NI</strong> and <strong>PCLMULQDQ</strong> instructions — dedicated silicon that does one AES round or one GHASH multiply per instruction. ChaCha20-Poly1305 has no equivalent hardware fast path; it runs as general-purpose ARX/polynomial arithmetic on the ALU regardless of what CPU it's on. That's precisely the tradeoff named in <a href="#chacha">§6</a>: on a CPU <em>without</em> AES-NI — many low-end ARM cores, some older mobile chips, some embedded/IoT targets — this result inverts and ChaCha20-Poly1305 wins, which is the whole reason it exists as a TLS 1.3 cipher suite alongside AES-GCM rather than as a replacement for it.</p>
+      </div>
+    </section>
+
+    <section id="coverage">
+      <h2><span class="num">15</span> Requirement coverage map</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Requirement</th><th>Statement</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill">FR-1..3, FR-9</span></td><td>Record protection, both AEAD configs, equivalent behavior</td><td><code>crypt.{h,cpp}</code></td></tr>
+            <tr><td><span class="pill">FR-4 / SR-4</span></td><td>AAD authenticated and verified</td><td><code>serializer.cpp</code> (<code>GetAADBytes</code>), <code>crypt.cpp</code> (<code>Decrypt</code>)</td></tr>
+            <tr><td><span class="pill">FR-5 / SR-3</span></td><td>Nonce management, no reuse under normal operation</td><td><code>crypt.cpp</code> (<code>GenerateNonce</code>); verified by TR-7</td></tr>
+            <tr><td><span class="pill">FR-6 / SR-2</span></td><td>Correct record recovery + integrity detection</td><td><code>crypt.cpp</code> (<code>Decrypt</code>, <code>DecryptAES_GCM</code>, <code>DecryptChaCha_Poly</code>)</td></tr>
+            <tr><td><span class="pill">FR-7 / SR-6</span></td><td>Reject on authentication failure, release nothing</td><td><code>receiver.cpp</code> (<code>catch</code> in <code>ConstructRecord</code>)</td></tr>
+            <tr><td><span class="pill">FR-8 / SR-5</span></td><td>Replay detection</td><td><code>receiver.{h,cpp}</code> (<code>seenRecIds</code>)</td></tr>
+            <tr><td><span class="pill">SR-1</span></td><td>Confidentiality</td><td>AEAD encryption itself</td></tr>
+            <tr><td><span class="pill">TR-1..8</span></td><td>Demonstrable, evidenced tests</td><td><code>test_suite.cpp</code></td></tr>
+            <tr><td><span class="pill">D3</span></td><td>README with build/run instructions</td><td><code>README.md</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">16</span> Limitations &amp; what production hardening would add</h2>
+      <ul>
+        <li><strong>Unbounded replay set</strong> — see <a href="#replay">§10</a>; a sliding window bounds memory for long-lived sessions.</li>
+        <li><strong>No key rotation or expiry</strong> — a static key file has no mechanism to retire compromised key material.</li>
+        <li><strong>No transport authentication of the channel itself</strong> — <code>tm.bin</code> has no access control; a real deployment needs the channel (socket, queue) secured or the threat model explicitly scoped to "ciphertext-only visibility," which the AEAD tag already defends against.</li>
+        <li><strong>Single-threaded, single-session assumptions</strong> — <code>Sender::sendCount</code> is a process-wide static counter; a multi-sender system sharing one key would need the partitioned-nonce scheme from <a href="#nonce">§8</a> to keep nonce spaces disjoint.</li>
+      </ul>
+      <p style="margin-top:1.6rem">None of these are bugs relative to the assignment's stated scope (§3.2 of the brief explicitly excludes key exchange, PKI, and transport-layer protocols) — they're the documented assumptions the Assignment 1 Report's Discussion section is asking for.</p>
+    </section>
+
+    <footer>
+      Reference notes for the CS6530 Assignment 1 codebase — generated to accompany the implementation, not a substitute for the submitted Assignment 1 Report.
+    </footer>
+  </main>
+</div>
